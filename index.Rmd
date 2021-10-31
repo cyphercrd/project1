@@ -19,73 +19,128 @@ tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
 
 ## Data Wrangling, Exploration, Visualization
 
-### Name and EID here
+#### Cameron Dang crd2724
 
-#### Introduction 
+### Introduction 
 
-Paragraph or two introducing your datasets and variables, why they are interesting to you, etc.
-
-```{R}
-# read your datasets in here, e.g., with read_csv()
-
-```
-
-#### Tidying: Reshaping
-
-If your datasets are tidy already, demonstrate that you can reshape data with pivot wider/longer here (e.g., untidy and then retidy). Alternatively, it may be easier to wait until the wrangling section so you can reshape your summary statistics. Note here if you are going to do this.
+I downloaded the google.csv and Amazon.csv datasets from the sources https://www.kaggle.com/pavan9065/google-stock-history and https://www.kaggle.com/kannan1314/amazon-stock-price-all-time, respectively. They have the date ID variable in common, which is formatted YYYY-MM-DD, and each data set has six numeric variables in common including the opening, high, low, close, and adjusted close prices, and the volume of shares traded. I chose these data sets because they are formatted similarly, and I have an interest in this data because I am an Amazon shareholder. I expect that the price movements will be similar over a long period of time since they are both successful technology companies. Note that the values contained in the open, high, low, close, and adjusted close columns indicate the corresponding prices on that particular day in U.S. dollars. The values contained in the volume column indicate the number of shares of the stock traded on that particular day.
 
 ```{R}
-# your tidying code (if applicable; can also wait until wrangling section)
+library(tidyverse)
+library(gt)
+goog <- read_csv("~/Documents/Fall 2021/SDS322E/project1/google.csv")
+amzn <- read_csv("~/Documents/Fall 2021/SDS322E/project1/Amazon.csv")
 ```
 
+### Tidying: Reshaping
+
+The amzn and goog datasets are already tidy, so I used the pivot_wider() function on goog to make it untidy. Each observation had its own row before this function was applied. After it was applied, each date had its own column. I made it tidy again by using the pivot_longer() function and selecting all of the date columns.
+
+```{R}
+# Datasets are tidy already. Untidying goog dataset
+googUntidy = goog %>% pivot_wider(names_from="Date",values_from="Open")
+googUntidy %>% head
+# retidying goog dataset
+googRetidy = googUntidy %>% pivot_longer(cols=6:4316,names_to="Date",values_to="Open",values_drop_na = T) %>% select(Date,Open,everything())
+googRetidy %>% head
+```
     
-#### Joining/Merging
+### Joining/Merging
 
 ```{R}
-# your joining code
+# checking start and end dates of goog
+# goog %>% arrange(Date)
+# goog %>% arrange(desc(Date))
 
-# your joining code
+# checking start and end dates of amzn
+# amzn %>% arrange(Date)
+# amzn %>% arrange(desc(Date))
+
+# checking number of dates in each dataset
+# goog %>% summarize(n_distinct(Date))
+# amzn %>% summarize(n_distinct(Date))
+
+# checking which variables appear in one dataset but not the other
+# anti_join(goog,amzn,by="Date")
+# anti_join(amzn,goog,by="Date")
+# anti_join(amzn,goog,by="Date") %>% arrange(desc(Date))
+
+# joining with inner join
+joinData = inner_join(goog,amzn,by="Date",suffix=c(".goog",".amzn")) 
+joinData %>% head
+
+# checking dates in common
+# joinData %>% arrange(Date)
+# joinData %>% arrange(desc(Date))
 ```
 
-Discussions of joining here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
+The goog dataset starts on 2004-08-19 and ends on 2021-10-01 with 4311 rows in total, which is also the number of unique IDs. The amzn dataset starts on 1997-05-15 and ends on 2021-09-29 with 6135 rows in total, which is also the number of unique IDs. There are only two unique IDs in the goog dataset that do not appear in the amzn dataset, whereas there are 1826 unique IDs in the amzn dataset that do not appear in the goog dataset. These are the dates 2021-09-30 and 2021-10-01, and the 1824 dates between 1997-05-15 and 2004-08-18, respectively. They have the 4309 dates ranging from 2004-08-19 to 2021-09-29 in common. Therefore, I used an inner join to select only these rows because I only want to examine the period of time in which both companies were publicly traded. The inner join resulted in dataset with 4309 rows and 13 columns, so it has 6 more columns than the original datasets. It dropped 4 rows from the goog dataset and it dropped 1824 rows from the amzn dataset. This could cause problems if we wanted to analyze Amazon's stock data since its conception in 1997, but it is fine here since we are only analyzing the period of time in which both Amazon and Google stock data existed i.e. from 2004 to 2021.
 
-####  Wrangling
+### Wrangling
 
 ```{R}
-# your wrangling code
+# creates a new column 'diffVolume' that computes the daily difference in trading volume between the two companies.
+# note that diffVolume > 0 when Volume.goog > Volume.amzn and diffVolume < 0 when Volume.goog < Volume.amzn
+joinData = joinData %>% mutate(diffVolume = Volume.goog - Volume.amzn)
 
-# your wrangling code
+# we can manipulate this to find the days when goog had a higher volume than amzn or vice-versa
+# joinData %>% filter(diffVolume > 0) %>% dim
+# joinData %>% filter(diffVolume < 0) %>% dim
+# we can see that, from 2004-08-19 to 2021-09-29, there are 1730 days when goog had a higher
+# volume than amzn and there are 2579 days where amzn had a higher volume than goog
 
-# your wrangling code
+# we can also see which days had the highest difference in volume and which days had the lowest
+# joinData %>% mutate(absDiffVolume = abs(diffVolume)) %>% select(Date,absDiffVolume) %>% arrange(absDiffVolume)
+# joinData %>% mutate(absDiffVolume = abs(diffVolume)) %>% select(Date,absDiffVolume) %>% arrange(desc(absDiffVolume))
+# lowest difference on 2009-09-24 highest on 2007-04-25
+
+# dichotimizing Date
+year = joinData$Date %>% str_replace("2004.+","2004") %>% str_replace("2005.+","2005") %>% str_replace("2006.+","2006") %>% str_replace("2007.+","2007") %>% str_replace("2008.+","2008") %>% str_replace("2009.+","2009") %>% str_replace("2010.+","2010") %>% str_replace("2011.+","2011") %>% str_replace("2012.+","2012") %>% str_replace("2013.+","2013") %>% str_replace("2014.+","2014") %>% str_replace("2015.+","2015") %>% str_replace("2016.+","2016") %>% str_replace("2017.+","2017") %>% str_replace("2018.+","2018") %>% str_replace("2019.+","2019") %>% str_replace("2020.+","2020") %>% str_replace("2021.+","2021")
+joinData = joinData %>% mutate(year=year)
+
+# counts for categorical variable
+# joinData %>% group_by(year) %>% summarize(n=n())
+
+# defining function that computes range
+range = function(x) {max(x) - min(x)}
+
+# summary statistics
+joinData %>% summarize_at(c(-1,-6,-12,-14,-15), .funs=list(mean=mean,sd=sd,max=max,min=min,range=range)) %>% pivot_longer(1:50) %>% separate(name,into=c("name","stat"),sep="_") %>% separate(name,into=c("variable","ticker")) -> table1
+table1 %>% head %>% gt 
+joinData %>% group_by(year) %>% summarize_at(c(-1,-6,-12,-14,-15), .funs=list(mean=mean,sd=sd,max=max,min=min,range=range)) %>%
+  pivot_longer(-1) %>% separate(name, into=c("name","stat"),sep="_") %>% pivot_wider() -> table2
+table2 %>% head %>% gt 
+
+# number of missing values for each variable
+# joinData %>% summarize_all(function(x) sum(is.na(x)))
 ```
 
-Your discussion of wrangling section here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
+I first created the variable 'diffVolume' that is defined as the Amazon trading volume subtracted from the Google trading volume, so positive values indicate a higher Google trading volume and negative values  indicate a higher Amazon trading volume. I found that, from 2004-08-19 to 2021-09-29, Google had a higher trading volume for 1730 days whereas Amazon had a higher trading volume for 2579. I am not knowledgeable enough about trading to understand what this implies about the companies, but I hypothesize that this might indicate higher volatility in Amazon. I also found that the smallest difference in trading volume was on 2009-09-24 and that the largest difference was on 2007-04-25, which I thought was interesting.
+For the summary statistics portion, I first dichotimized the 'Date' variable by year and saved the new categorical variable as 'year' by using the str_replace() function and regex. This new variable contained each year from 2004 to 2021. Each year had 250-253 counts except for 2004 and 2021, which had 94 and 187 counts, respectively. This makes sense because data collection was ongoing in 2021 for each dataset, and one of the datasets began data collection in 2004. I then defined the function range() which computes the difference between the maximum and minimum value of its input. I created two summary statistics tables including all variables except for 'Date', 'year', 'Adj Close', and 'diffVolume'. They included the functions mean(), sd(), max(), min(), and the aforementioned range() function. The first table, table1, did not group any variables. The second table, table2, grouped by the categorical 'year' variable. They were both piped into gt format. Table1 shows that the mean prices were higher for Amazon, but Google had higher mean trading volume. This same trend applies to standard deviations. Lastly, there were zero NAs for any variable because joinData was created using inner_join() and the two datasets had all variables in common.
 
 
-#### Visualizing
+### Visualizing
 
 ```{R}
-# your plot 1
+joinData %>% ggplot(aes(x=Open.goog,y=Open.amzn)) + geom_point() + geom_smooth(method='lm') + ggtitle("Opening Prices of Google vs. Amazon From 2004 to 2021",) + xlab("Google Opening Price ($)") + ylab("Amazon Opening Price ($)") + scale_y_continuous(breaks = seq(0,5000,500)) + scale_x_continuous(breaks = seq(0,5000,500)) + theme_minimal()
 ```
 
-Your discussion of plot 1
+We can see that there is a linear relationship between the opening prices of Amazon and Google from 2004 to 2021, which is demonstrated by the blue regression line. Something important to note, that I believe is easy to overlook, is the scales of the axes. The x-axis only ranges between 0 and 3000 dollars whereas the y-axis ranges between 0 and 4500 dollars. So, the regression line indicates points at which the opening price for Amazon is larger than the opening price for Google. Something that I found particularly interesting is that the graph appears parabolic in the domain of 0 to 1500 dollars, but shortly afterwards it seems to "correct" to a linear correlation. There are several possible explanations of this behavior. My theory is that, at some point, Amazon had explosive growth relative to Google, but then Google also experienced explosive growth shortly afterwards. Overall, the results of this graph are in-line with the principle that stocks of the same industry tend to follow similar price movements.
 
 ```{R}
-# your plot 2
+joinData %>% ggplot(aes(x=year,y=diffVolume)) + geom_bar(stat="summary",fun=mean) + geom_errorbar(stat="summary", fun.data=mean_se) + scale_y_continuous(breaks = seq(-2e7,2e7,1.25e6)) + geom_hline(yintercept=0) + theme_minimal() + ggtitle("Differences in Amazon and Google Trading Volume per Year") + ylab("Difference in Trading Volume (Numbers of Shares)") + xlab("Year")
 ```
 
-Your discussion of plot 2
+I'd like to reiterate that positive values indicate higher trading volume for Google and that negative values indicate higher trading volume for Amazon. We can see that Google had a higher trading volume in [2004,2008] and [2011,2013]. Amazon had higher trading volume in the remaining ten years. This is interesting because our summary statistics showed that Google had a higher mean trading volume than Amazon. This means that the magnitudes of the differences in the six positive years were great enough to offset the ten negative years. I think the reason for the large differences in 2004-2006 is that Google began public trading in 2004 whereas Amazon had already been publicly traded for 7 years.
 
 ```{R}
-# your plot 3
+# note: had to wrangle a little to create grouped box plot
+open = joinData %>% filter(year=="2017") %>% pivot_longer(c(Open.goog,Open.amzn),names_to = "ticker",values_to="open") %>% select(ticker,open)
+open$ticker = str_replace(open$ticker,"Open.","")
+open %>% ggplot(aes(x=ticker,y=open)) + stat_boxplot(geom='errorbar') + geom_boxplot() + geom_jitter(alpha=0.2) + ggtitle("Opening Prices of Amazon vs. Google in 2017") + ylab("Opening Price ($)") + xlab("") + scale_y_continuous(breaks=seq(700,1300,50)) + scale_x_discrete(labels=c("Amazon","Google")) + theme_minimal()
 ```
 
-Your discussion of plot 3
+I chose 2017 simply because that was the year that both Amazon and Google began rapid increases in value. However, it is simple to change the filter to any year. We can see that Amazon had both a wider spread and higher quartiles than Google in 2017. Amazon also had outliers on its upper end, whereas Google did not. I believe that this indicates that Amazon was much more volatile than Google in 2017. This is consistent with my wrangling discussion, in which I posited that Amazon had higher volatility than Google because it had more days with higher trading volume. We can also see in the second graph that Amazon had higher trading volume than Google in 2017. I am curious if this trend, relative spreads in the third graph reflecting the signs in the second graph, holds for all years.
 
-#### Concluding Remarks
-
-If any!
-
-
-
-
+### Closing Remarks
+My prediction that the price movements of Google and Amazon would be similar was correct. In the future, I would like to explore the relationship between the relative spreads of opening prices and relative trading volumes, as mentioned in the discussion of the third graph. It would also be interesting to examine what factors influence price movements, such as those displayed in the first graph. Lastly, I found that the company with the smaller mean trading volume, Amazon, also had greater mean prices. I wonder if this is also true of other companies.
