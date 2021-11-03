@@ -99,17 +99,17 @@ year = joinData$Date %>% str_replace("2004.+","2004") %>% str_replace("2005.+","
 joinData = joinData %>% mutate(year=year)
 
 # counts for categorical variable
-# joinData %>% group_by(year) %>% summarize(n=n())
+joinData %>% group_by(year) %>% summarize(n=n())
 
 # defining function that computes range
 range = function(x) {max(x) - min(x)}
 
 # summary statistics
 joinData %>% summarize_at(c(-1,-6,-12,-14,-15), .funs=list(mean=mean,sd=sd,max=max,min=min,range=range)) %>% pivot_longer(1:50) %>% separate(name,into=c("name","stat"),sep="_") %>% separate(name,into=c("variable","ticker")) -> table1
-table1 %>% head %>% gt 
+table1 %>% gt 
 joinData %>% group_by(year) %>% summarize_at(c(-1,-6,-12,-14,-15), .funs=list(mean=mean,sd=sd,max=max,min=min,range=range)) %>%
   pivot_longer(-1) %>% separate(name, into=c("name","stat"),sep="_") %>% pivot_wider() -> table2
-table2 %>% head %>% gt 
+table2 %>% gt 
 
 # number of missing values for each variable
 # joinData %>% summarize_all(function(x) sum(is.na(x)))
